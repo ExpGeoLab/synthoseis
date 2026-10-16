@@ -393,7 +393,7 @@ project_folder/
 |-----------|------|---------|-------------|
 | `include_salt` | bool | true | Enable salt bodies |
 | `basin_floor_fans` | bool | false | Enable fan features |
-| `include_channels` | bool | false | Enable channels (deprecated) |
+| `include_channels` | bool | false | Insert meandering fluvial channel belts (sand bodies, meanderpy) |
 | `variable_shale_ng` | bool | false | Enable lateral NG variation |
 | `partial_voxels` | bool | true | Enable partial voxel blending |
 

@@ -75,15 +75,6 @@ class Geomodel:
             "depth_randomised_prefault", shape=cube_shape
         )
 
-        # Channel volumes
-        if self.cfg.include_channels:
-            self.floodplain_shale = None
-            self.channel_fill = None
-            self.shale_channel_drape = None
-            self.levee = None
-            self.crevasse = None
-            self.channel_segments = None
-
     def build_unfaulted_geomodels(self):
         """
         Build unfaulted geomodels.

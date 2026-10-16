@@ -589,7 +589,7 @@ class ChannelBelt:
         )  # initial (sloped) topography
         topo[:, :, 0] = topoinit.copy()
         surf = topoinit.copy()
-        facies[0] = np.NaN
+        facies[0] = np.nan
         # generate surfaces:
         channels3D = []
         for i in trange(n_steps):
@@ -612,7 +612,7 @@ class ChannelBelt:
             topo[:, :, 4 * i] = surf  # erosional surface
             dists[:, :, i] = cl_dist
             zmaps[:, :, i] = z_map
-            facies[4 * i] = np.NaN
+            facies[4 * i] = np.nan
 
             if model_type == "fluvial":
                 pb = point_bar_surface(cl_dist, z_map, h, w / dx)
@@ -974,12 +974,12 @@ def find_cutoffs(x, y, crdist, deltas):
     # distance matrix for centerline points:
     dist = distance.cdist(np.array([x, y]).T, np.array([x, y]).T)
     dist[dist > crdist] = (
-        np.NaN
+        np.nan
     )  # set all values that are larger than the cutoff threshold to NaN
     # set matrix to NaN along the diagonal zone:
     for k in range(-diag_blank_width, diag_blank_width + 1):
         rows, cols = kth_diag_indices(dist, k)
-        dist[rows, cols] = np.NaN
+        dist[rows, cols] = np.nan
     i1, i2 = np.where(~np.isnan(dist))
     ind1 = i1[np.where(i1 < i2)[0]]  # get rid of unnecessary indices
     ind2 = i2[np.where(i1 < i2)[0]]  # get rid of unnecessary indices

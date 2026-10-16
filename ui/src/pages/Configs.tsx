@@ -204,7 +204,7 @@ const paramDefinitions: Record<string, ParamDefinition> = {
     name: 'Include Channels',
     type: 'boolean',
     default: false,
-    description: 'Switch to turn on/off channels. Note: This feature is deprecated and currently always set to false.'
+    description: 'Switch to turn on/off fluvial channel belts. Inserts one or two meandering point-bar sand bodies, which adds roughly 10-30 seconds to model generation.'
   },
   include_salt: {
     name: 'Include Salt',

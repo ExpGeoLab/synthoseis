@@ -213,34 +213,6 @@ class Faults(Horizons, Geomodel):
             _faulted_onlap_segments, 0.45
         )
         del _faulted_onlap_segments
-        if self.cfg.include_channels:
-            self.vols.floodplain_shale = self.apply_xyz_displacement(
-                self.vols.floodplain_shale
-            )
-            self.vols.channel_fill = self.apply_xyz_displacement(self.vols.channel_fill)
-            self.vols.shale_channel_drape = self.apply_xyz_displacement(
-                self.vols.shale_channel_drape
-            )
-            self.vols.levee = self.apply_xyz_displacement(self.vols.levee)
-            self.vols.crevasse = self.apply_xyz_displacement(self.vols.crevasse)
-
-            (
-                self.vols.channel_segments,
-                self.vols.geologic_age,
-            ) = self.reassign_channel_segment_encoding(
-                self.vols.geologic_age,
-                self.vols.floodplain_shale,
-                self.vols.channel_fill,
-                self.vols.shale_channel_drape,
-                self.vols.levee,
-                self.vols.crevasse,
-                self.maps.channels,
-            )
-            if self.cfg.model_qc_volumes:
-                self.vols.write_cube_to_disk(
-                    self.vols.channel_segments, "channel_segments"
-                )
-
         if self.cfg.model_qc_volumes:
             # Output files if qc volumes required
             self.vols.write_cube_to_disk(self.faulted_age_volume[:], "geologic_age")

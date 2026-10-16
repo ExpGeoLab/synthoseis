@@ -1236,96 +1236,175 @@ class BasinFloorFans(Horizons):
         plt.close()
 
 
-class Channel(Horizons):
-    def __init__(self):
-        self.W = 200.0  # Channel wodth
-        self.D = 12.0  # Channel depth
-        self.pad = 100  # padding (number of nodepoints along centerline)
-        self.deltas = 50.0  # sampling distance along centerline
-        self.nit = 2000  # number of iterations
-        self.Cf = 0.022  # dimensionless Chezy friction factor
-        self.crdist = 1.5 * self.W  # threshold distance at which cutoffs occur
-        self.kl = 60.0 / (365 * 24 * 60 * 60.0)  # migration rate constant (m/s)
-        self.kv = 1.0e-11  # vertical slope-dependent erosion rate constant (m/s)
-        self.dt = 2 * 0.05 * 365 * 24 * 60 * 60.0  # time step (s)
-        self.dens = 1000  # density of water (kg/m3)
-        self.saved_ts = 20  # which time steps will be saved
-        self.n_bends = 30  # approximate number of bends to model
-        self.Sl = 0.0  # initial slope (matters more for submarine channels than rivers)
-        self.t1 = 500  # time step when incision starts
-        self.t2 = 700  # time step when lateral migration starts
-        self.t3 = 1400  # time step when aggradation starts
-        self.aggr_factor = (
-            4e-9  # aggradation factor (m/s, about 0.18 m/year, it kicks in after t3)
-        )
+class FluvialChannels(Horizons):
+    """Meandering fluvial channel belts inserted as sand bodies in single layers.
 
-        self.h_mud = 0.3  # thickness of overbank deposits for each time step
-        self.dx = 20.0  # gridcell size in metres
+    A kinematic meander simulation (meanderpy) is run for each channel episode and
+    the resulting point-bar sand thickness is converted into a thickness map. The
+    map is inserted into the horizon stack in the same way as basin floor fans, so
+    faulting, lithology, closures and seismic all treat it as a sand layer.
+    """
 
-        # Channel objects
-        self.ch = None
-        self.chb = None
-        self.chb_3d = None
+    bin_size_m = 25.0  # lateral cell size of the cube (m)
+    ms_per_metre = 1.0  # TWT thickness (ms) per metre of sediment (approx. 2000 m/s)
+    min_spacing = 3  # minimum separation (layers) from other sand bodies
 
-    def generate_channel_parameters(self):
-        # select random parameters
-        pass
+    def __init__(self, parameters, max_layers):
+        self.cfg = parameters
+        self.max_layers = max_layers
+        self.channel_layers = None
+        self.channel_thicknesses = []
 
-    def create_channel_3d(self):
-        # Initialise channel
-        self.ch = mp.generate_initial_channel(
-            self.W, self.D, self.Sl, self.deltas, self.pad, self.n_bends
+    def _generate_channel_lookup_table(self, n_layers, exclude=()):
+        """Choose which layers contain a channel belt, away from `exclude` layers."""
+        n_channels = int(np.random.choice([1, 1, 2]))
+        exclude = [int(e) for e in exclude]
+        chosen = []
+        candidates = np.arange(10, max(11, n_layers - 10))
+        for _ in range(n_channels):
+            ok = [
+                c
+                for c in candidates
+                if all(abs(c - e) >= self.min_spacing for e in exclude + chosen)
+            ]
+            if not ok:
+                break
+            chosen.append(int(np.random.choice(ok)))
+        self.channel_layers = np.sort(np.array(chosen, dtype="int"))
+        return self.channel_layers
+
+    def _simulate_sand_thickness(self):
+        """Run a meander simulation and return sand thickness (m) on a square grid."""
+        from datagenerator import meanderpy as mp
+
+        nx, ny = self.cfg.cube_shape[:2]
+        # Square domain big enough to rotate and crop to the cube footprint
+        n_cells = int(np.ceil(np.sqrt(2.0) * max(nx, ny))) + 2
+        dx = self.bin_size_m
+        window = n_cells * dx
+
+        width = np.random.uniform(80.0, 250.0)  # channel width (m)
+        depth = np.clip(width / np.random.uniform(15.0, 25.0), 6.0, 20.0)
+        deltas = 50.0  # sampling distance along centerline (m)
+        pad = 100
+        n_bends = int(np.ceil(1.5 * (window + 4000.0) * 2.0 / (10.0 * width)))
+        nit = 600
+        saved_ts = nit // 20
+        kl = np.random.uniform(40.0, 80.0) / (365 * 24 * 60 * 60.0)
+        dt = 2 * 0.05 * 365 * 24 * 60 * 60.0
+
+        ch = mp.generate_initial_channel(width, depth, 0.0, deltas, pad, n_bends)
+        chb = mp.ChannelBelt(
+            channels=[ch], cutoffs=[], cl_times=[0.0], cutoff_times=[]
         )
-        # Create channel belt object
-        self.chb = mp.ChannelBelt(
-            channels=[self.ch], cutoffs=[], cl_times=[0.0], cutoff_times=[]
+        chb.migrate(
+            nit, saved_ts, deltas, pad, 1.5 * width, 0.022, kl, 1.0e-11, dt, 1000,
+            100, 200, 450, 4.0e-9,
         )
-        # Migrate channel
-        self.chb.migrate(
-            self.nit,
-            self.saved_ts,
-            self.deltas,
-            self.pad,
-            self.crdist,
-            self.Cf,
-            self.kl,
-            self.kv,
-            self.dt,
-            self.dens,
-            self.t1,
-            self.t2,
-            self.t3,
-            self.aggr_factor,
-        )
-        end_time = self.chb.cl_times[-1]
-        _xmin = 15000
-        _xmax = 21000
-        self.chb_3d, _, _, _, _ = self.chb.build_3d_model(
+        x_all = chb.channels[-1].x
+        lo = x_all.min() + 500.0
+        hi = max(lo + 1.0, x_all.max() - window - 500.0)
+        # Meanders develop downstream: sample the window from the downstream half
+        xmin = float(np.random.uniform(lo + 0.5 * (hi - lo), hi))
+        model, _, _, _, _ = chb.build_3d_model(
             "fluvial",
-            h_mud=self.h_mud,
+            h_mud=0.3,
             levee_width=800.0,
-            h=12.0,
-            w=self.W,
+            h=depth,
+            w=width,
             bth=0.0,
             dcr=10.0,
-            dx=self.dx,
-            delta_s=self.deltas,
-            starttime=self.chb.cl_times[0],
-            endtime=end_time,
-            xmin=_xmin,
-            xmax=_xmax,
-            ymin=-3000,
-            ymax=3000,
+            dx=dx,
+            delta_s=deltas,
+            starttime=chb.cl_times[0],
+            endtime=chb.cl_times[-1],
+            xmin=xmin,
+            xmax=xmin + window,
+            ymin=-window / 2.0,
+            ymax=window / 2.0,
         )
+        layer_thickness = np.diff(model.strat, axis=2)
+        sand = np.where(model.facies == 1)[0]  # point bar
+        return layer_thickness[..., sand].sum(axis=2)
 
-    def insert_channel_into_horizons(self, layer, depth_maps):
-        new_depth_maps = self.insert_feature_into_horizon_stack(
-            self.chb.strat, layer, depth_maps
+    def _generate_channel_thickness_map(self):
+        """Channel sand thickness map in work-cube samples, shape == cube_shape[:2]."""
+        from scipy.ndimage import gaussian_filter, rotate
+
+        nx, ny = self.cfg.cube_shape[:2]
+        thickness_m = self._simulate_sand_thickness()
+        thickness_m = rotate(
+            thickness_m, np.random.uniform(0.0, 360.0), reshape=False, order=1
+        )
+        r0 = (thickness_m.shape[0] - ny) // 2
+        c0 = (thickness_m.shape[1] - nx) // 2
+        thickness_m = thickness_m[r0 : r0 + ny, c0 : c0 + nx].T
+        thickness_m = gaussian_filter(thickness_m, 1.0)
+        thickness_m[thickness_m < 0.25] = 0.0
+        # metres -> ms -> samples of the (infilled) work cube
+        samples = (
+            thickness_m
+            * self.ms_per_metre
+            * self.cfg.infill_factor
+            / self.cfg.digi
+        )
+        return samples
+
+    def insert_channels_into_horizons(self, depth_maps, exclude=()):
+        """Insert channel belts; returns the new depth maps.
+
+        Layers are inserted in ascending order, so each recorded layer number is
+        valid in the final stack. Use `shift_layers` to update other layer lists.
+        """
+        new_depth_maps = depth_maps[:].copy()
+        self._generate_channel_lookup_table(new_depth_maps.shape[-1], exclude)
+        self.channel_thicknesses = []
+        for layer in self.channel_layers:
+            thickness_map = self._generate_channel_thickness_map()
+            self.channel_thicknesses.append(thickness_map)
+            new_depth_maps = self.insert_feature_into_horizon_stack(
+                thickness_map, layer, new_depth_maps
+            )
+            if self.cfg.qc_plots:
+                self.channel_qc_plot(layer, thickness_map)
+        self.cfg.write_to_logfile(
+            f"number_channel_episodes: {len(self.channel_layers)}\n"
+            f"channel_horizon_list: {str(self.channel_layers)}"
+        )
+        self.cfg.write_to_logfile(
+            msg=None,
+            mainkey="model_parameters",
+            subkey="number_channel_episodes",
+            val=len(self.channel_layers),
+        )
+        self.cfg.write_to_logfile(
+            msg=None,
+            mainkey="model_parameters",
+            subkey="channel_horizon_list",
+            val=str(self.channel_layers),
         )
         return new_depth_maps
 
-    def insert_channel_facies(self):
-        pass
+    def shift_layers(self, layers):
+        """Return `layers` (inserted before the channels) renumbered for the final stack."""
+        shifted = np.array(layers, dtype="int").copy()
+        for channel_layer in self.channel_layers:
+            shifted[shifted >= channel_layer] += 1
+        return shifted
+
+    def channel_qc_plot(self, layer, thickness):
+        """Save a map of the channel sand thickness."""
+        from datagenerator.util import import_matplotlib
+
+        plt = import_matplotlib()
+        plt.figure()
+        plt.imshow(thickness.T, cmap="viridis")
+        plt.colorbar(label="sand thickness (work-cube samples)")
+        plt.title(f"Channel belt, layer {layer}")
+        plt.savefig(
+            os.path.join(self.cfg.work_subfolder, f"FluvialChannel_layer_{layer}.png")
+        )
+        plt.close()
 
 
 class Facies:
@@ -1494,6 +1573,23 @@ def build_unfaulted_depth_maps(parameters: Parameters):
             bff.fan_qc_plot(depth_maps, layer, thickness)
         fan_list = bff.fan_layers
         fan_thicknesses = bff.fan_thicknesses
+    if parameters.include_channels:
+        channels = FluvialChannels(parameters, depth_maps.shape[-1])
+        exclude = list(onlap_horizon_list)
+        if fan_list is not None:
+            exclude += list(fan_list)
+        depth_maps = channels.insert_channels_into_horizons(depth_maps, exclude)
+        # Layers already recorded sit above/below the inserted channels: renumber them
+        onlap_horizon_list = list(channels.shift_layers(onlap_horizon_list))
+        sand_layers = list(channels.channel_layers)
+        sand_thicknesses = list(channels.channel_thicknesses)
+        if fan_list is not None:
+            sand_layers += list(channels.shift_layers(fan_list))
+            sand_thicknesses += list(fan_thicknesses)
+        # Channels are sand bodies like fans: merge into one list sorted by layer
+        order = np.argsort(sand_layers)
+        fan_list = np.array(sand_layers, dtype="int")[order]
+        fan_thicknesses = [sand_thicknesses[i] for i in order]
     return depth_maps, onlap_horizon_list, fan_list, fan_thicknesses
 
 
