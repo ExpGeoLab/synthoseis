@@ -8,6 +8,7 @@ import RunDetail from './pages/RunDetail'
 import Faults from './pages/Faults'
 import RockPhysics from './pages/RockPhysics'
 import Wavelets from './pages/Wavelets'
+import FeaturePreview from './pages/FeaturePreview'
 import Augmentation from './pages/Augmentation'
 import Datasets from './pages/Datasets'
 
@@ -23,6 +24,7 @@ function App() {
           <Route path="/faults" element={<Faults />} />
           <Route path="/rockphysics" element={<RockPhysics />} />
           <Route path="/wavelets" element={<Wavelets />} />
+          <Route path="/features" element={<FeaturePreview />} />
           <Route path="/augmentation" element={<Augmentation />} />
           <Route path="/datasets" element={<Datasets />} />
           <Route path="*" element={<Navigate to="/" replace />} />

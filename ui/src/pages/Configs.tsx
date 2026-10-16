@@ -18,223 +18,249 @@ const paramDefinitions: Record<string, ParamDefinition> = {
     name: 'Project',
     type: 'string',
     default: 'example',
-    description: 'Name of project. Used to select the rock property model associated with the project. Must match a rockphysics module name (e.g., "example", "abc").'
+    description: 'Selects the rock-physics model that turns lithology into velocity and density (must match a module in rockphysics/, e.g. "example"). A different project changes the seismic amplitudes and how strongly sand and shale contrast.'
   },
   project_folder: {
     name: 'Project Folder',
     type: 'string',
     default: '/scratch/synthoseis_example',
-    description: 'Output directory for generated models. Must be a valid path where the user has write permissions.'
+    description: 'Where each run writes its output: seismic volumes, labels, QC images and logs. Every run gets its own subfolder, so earlier results are not overwritten.'
   },
   work_folder: {
     name: 'Work Folder',
     type: 'string',
     default: '/scratch',
-    description: 'Temporary folder used for storing intermediate data. This folder is deleted on model completion.'
+    description: 'Scratch space for intermediate files, deleted when a run finishes. It needs enough free disk for the cube you choose, but it does not change the results.'
   },
   cube_shape: {
     name: 'Cube Shape',
     type: 'number_array',
     default: [300, 300, 1250],
-    description: 'Number of samples in [X, Y, Z] for output seismic data. Larger values produce higher resolution but require more memory.'
+    description: 'Output size as [inlines, crosslines, samples]. A bigger cube shows more geology (more faults, wider channels and fans) but memory and run time grow roughly with the number of voxels. Use a small cube such as 100 x 100 for quick tests.'
   },
   incident_angles: {
     name: 'Incident Angles',
     type: 'number_array',
     default: [7, 15, 24],
-    description: 'Central angle for the output seismic angle-stacks (in degrees). Typically: near=7°, mid=15°, far=24°.'
+    description: 'Angles (degrees) of the near, mid and far angle-stack volumes. Wider angles carry more AVO effect, so hydrocarbon sands look more different between the near and far stacks.'
   },
   digi: {
     name: 'Digitization',
     type: 'number',
     default: 4,
-    description: 'Vertical sampling rate in milliseconds. Lower values give higher resolution but larger data volumes.'
+    description: 'Vertical sample interval of the output seismic in milliseconds. Smaller values give finer vertical detail and more samples for the same time span; the time covered is samples x interval, so changing it also changes how much geology fits in the cube.'
   },
   infill_factor: {
     name: 'Infill Factor',
     type: 'number',
     default: 10,
-    description: 'Initial oversampling multiplier in the Z direction. Due to memory constraints, this is only used to construct the initial, unfaulted horizons. Higher values produce smoother layers but use more memory.'
+    description: 'Vertical oversampling used while the layers are built, before they are reduced to the output sampling. Higher values resolve thin layers and gently dipping surfaces better but multiply memory use. It does not change the output sampling.'
   },
   initial_layer_stdev: {
     name: 'Initial Layer Stdev',
     type: 'number_array',
     default: [7.0, 25.0],
-    description: 'Standard deviation of the depth of initial horizon at the base of the model. Random value is chosen between [low, high] range. Controls the initial roughness of the geological model.'
+    description: 'Roughness of the starting surface at the base of the model, as a [min, max] range in samples. Higher values give a more undulating, structurally varied model (more potential closures); lower values give flatter layering.'
   },
   thickness_min: {
     name: 'Minimum Layer Thickness',
     type: 'number',
     default: 2,
-    description: 'Minimum thickness of layers in samples. Controls the thinnest geological layer that can be created.'
+    description: 'Thinnest layer that can be generated, in samples. Raising it removes the finest layering, so there are fewer closely spaced reflections.'
   },
   thickness_max: {
     name: 'Maximum Layer Thickness',
     type: 'number',
     default: 12,
-    description: 'Maximum thickness of layers in samples. Controls the thickest geological layer that can be created.'
+    description: 'Thickest layer that can be generated, in samples. Lowering it makes layering more uniform and finer; raising it allows a few thick, transparent intervals between reflections.'
   },
   seabed_min_depth: {
     name: 'Seabed Minimum Depth',
     type: 'number_array',
     default: [20, 50],
-    description: 'Random thickness layers are "deposited" on top of previous layers. When a horizon\'s minimum depth is below this value, this becomes the top-most horizon (usually the seabed). Value in samples.'
+    description: 'Range for how deep the seabed sits below the top of the cube, in samples. Larger values leave a thicker water column at the top and less sediment in the cube.'
   },
   signal_to_noise_ratio_db: {
     name: 'Signal to Noise Ratio (dB)',
     type: 'number_array',
     default: [7.5, 12.5, 17.5],
-    description: 'Signal to noise ratio in decibels to control the noise level of the output seismic data. Random value chosen from triangular distribution [left, mode, right]. Higher values = cleaner data.'
+    description: '[low, mode, high] of a triangular distribution in dB; one value is drawn per model. Lower values give noisy seismic that is harder to interpret, higher values give clean data. Mixing values makes a training set more robust.'
   },
   bandwidth_low: {
     name: 'Bandwidth Low',
     type: 'number_array',
     default: [3.0, 6.0],
-    description: 'Bandpass low-cut frequency in Hz. Chosen randomly between [low, high]. Controls the low-frequency content of the seismic signal.'
+    description: 'Low-cut frequency range in Hz; one value is drawn per model. Raising it removes low-frequency content, giving a more oscillatory wavelet with less smooth trend; lowering it keeps broader, smoother events.'
   },
   bandwidth_high: {
     name: 'Bandwidth High',
     type: 'number_array',
     default: [20.0, 35.0],
-    description: 'Bandpass high-cut frequency in Hz. Chosen randomly between [low, high]. Controls the high-frequency content of the seismic signal.'
+    description: 'High-cut frequency range in Hz; one value is drawn per model. Higher values give sharper, higher-resolution seismic that separates thinner beds; lower values blur thin layers together.'
   },
   bandwidth_ord: {
     name: 'Bandwidth Order',
     type: 'number',
     default: 4,
-    description: 'Order of the slope used in the bandpass filter. Higher values create steeper filter roll-off.'
+    description: 'Order (steepness) of the band-pass filter. Higher values give sharper cut-offs but more ringing around strong events; lower values give gentler roll-off.'
   },
   dip_factor_max: {
     name: 'Dip Factor Maximum',
     type: 'number',
     default: 2,
-    description: 'A scaling factor applied to the dip of each layer. Higher values create steeper geological dips.'
+    description: 'Scales how steeply layers tilt during tilting (onlap) episodes. Larger values give steeper dips and more onlap terminations, which means more stratigraphic traps and more structural complexity.'
   },
   min_number_faults: {
     name: 'Minimum Number of Faults',
     type: 'number',
     default: 1,
-    description: 'Minimum number of faults in the model. Faults add structural complexity to the geological model.'
+    description: 'Lower end of the number of faults drawn per model. Each fault offsets the layers and can form fault-bounded closures; raising it makes every model more heavily faulted.'
   },
   max_number_faults: {
     name: 'Maximum Number of Faults',
     type: 'number',
     default: 6,
-    description: 'Maximum number of faults in the model. Controls the maximum structural complexity from faulting.'
+    description: 'Upper end of the number of faults drawn per model. Raising it allows more heavily faulted models; keep it equal to the minimum for a fixed number of faults.'
   },
   pad_samples: {
     name: 'Padding Samples',
     type: 'number',
     default: 10,
-    description: 'Additional padding in Z-direction to avoid edge effects, given in samples. Helps prevent artifacts at model boundaries.'
+    description: 'Extra samples added above and below the cube while modelling and then removed. More padding avoids edge artifacts at the top and bottom, especially with large fault throws. It does not change the output size.'
   },
   max_column_height: {
     name: 'Maximum Column Height',
     type: 'number_array',
     default: [150.0, 150.0],
-    description: 'Maximum vertical height of column in a 3D closure (trap). Used to identify valid hydrocarbon closures.'
+    description: 'Upper limit on how tall a hydrocarbon column in a closure can be. Lower values give partly filled traps; higher values let closures fill to their spill point, giving larger hydrocarbon volumes and stronger flat-spot responses.'
   },
   closure_types: {
     name: 'Closure Types',
     type: 'string_array',
     default: ['simple', 'faulted', 'onlap'],
-    description: 'Enables specific closure types: "simple" (4-way structural), "faulted" (3-way fault-dependent), "onlap" (stratigraphic).'
+    description: 'Which trap types may contain hydrocarbons: "simple" (four-way dip closure), "faulted" (fault-dependent) and "onlap" (stratigraphic pinch-out). Removing a type removes those closures and their hydrocarbon response from the labels and the seismic.'
   },
   min_closure_voxels_simple: {
     name: 'Min Simple Closure Voxels',
     type: 'number',
     default: 500,
-    description: 'Oil or gas filled simple closures with fewer voxels than this threshold will be filled with brine instead. Filters out small uneconomic closures.'
+    description: 'Simple closures smaller than this many voxels are filled with brine instead of oil or gas, so they have no hydrocarbon response. Raising it leaves fewer, larger accumulations; lowering it keeps small ones, which are harder to see.'
   },
   min_closure_voxels_faulted: {
     name: 'Min Faulted Closure Voxels',
     type: 'number',
     default: 2500,
-    description: 'Minimum voxel threshold for faulted closures. Higher threshold than simple closures due to complexity.'
+    description: 'Faulted closures smaller than this many voxels are filled with brine. The default is higher than for simple closures because fault-bounded traps are more complex.'
   },
   min_closure_voxels_onlap: {
     name: 'Min Onlap Closure Voxels',
     type: 'number',
     default: 500,
-    description: 'Minimum voxel threshold for stratigraphic (onlap) closures.'
+    description: 'Onlap (stratigraphic) closures smaller than this many voxels are filled with brine. Raising it leaves fewer pinch-out accumulations in the labels.'
   },
   sand_layer_thickness: {
     name: 'Sand Layer Thickness',
     type: 'number',
     default: 2,
-    description: 'Average thickness of stacked sand layers a priori, given in number of layers. Controls sand package thickness.'
+    description: 'Typical number of consecutive sand layers when sand occurs. Higher values stack sand together into thick packages with thick shale between them; lower values alternate sand and shale quickly, giving more reflections.'
   },
   sand_layer_fraction: {
     name: 'Sand Layer Fraction',
     type: 'object',
     default: { min: 0.05, max: 0.25 },
-    description: 'Average percentage of sand layers in model a priori. Random value chosen between min and max. Higher = more sand-prone basin.'
+    description: 'Fraction of layers that are sand, drawn between min and max per model. Higher values give sand-rich models with more reservoir and more potential closures; lower values give shale-dominated models.'
   },
   extra_qc_plots: {
     name: 'Extra QC Plots',
     type: 'boolean',
     default: true,
-    description: 'Switch to turn on/off additional QC output PNG plots. Generates visual quality control images of the model.'
+    description: 'Saves extra PNG diagnostics in the run folder, such as lithology, fan and channel plots. They appear under QC Images on the run page. It slows a run a little and does not change the seismic.'
   },
   verbose: {
     name: 'Verbose',
     type: 'boolean',
     default: true,
-    description: 'Switch to turn on/off verbose logging. More detailed console output when enabled.'
+    description: 'Writes more progress and diagnostic text to the log. It does not change the results.'
   },
   partial_voxels: {
     name: 'Partial Voxels',
     type: 'boolean',
     default: true,
-    description: 'If true, calculate an average property inside voxels that span multiple layers. More accurate but slower.'
+    description: 'On: voxels that cross a layer boundary get a blended property, giving smoother, more realistic reflections on thin and dipping layers. Off: each voxel takes one layer\'s value, giving blockier boundaries but a faster run.'
   },
   variable_shale_ng: {
     name: 'Variable Shale Net-to-Gross',
     type: 'boolean',
     default: false,
-    description: 'If true, enable net-to-gross to vary laterally in shale layers. If false, uses net-to-gross of 0 (all shale).'
+    description: 'On: shale layers get a low, laterally varying net-to-gross, adding subtle amplitude variation inside shales. Off: shales are pure shale (net-to-gross 0), giving a cleaner sand-shale contrast.'
   },
   basin_floor_fans: {
     name: 'Basin Floor Fans',
     type: 'boolean',
     default: false,
-    description: 'Switch to turn on/off basin floor fan-shaped features in layers. Adds turbidite fan geobodies.'
+    description: 'Inserts 1 to 3 fan-shaped sand bodies that thin to zero at their edges. They show as lobate amplitude anomalies on time slices and add pinch-out geometry and stratigraphic trap potential. Shapes are random; see the Features page for typical ones.'
   },
   include_channels: {
     name: 'Include Channels',
     type: 'boolean',
     default: false,
-    description: 'Switch to turn on/off fluvial channel belts. Inserts one or two meandering point-bar sand bodies, which adds roughly 10-30 seconds to model generation.'
+    description: 'Inserts meandering channel belts as sand bodies: sinuous point-bar anomalies on time slices, about 5 to 20 m thick. Each channel adds roughly 5 to 10 seconds to a run. Preview and tune them on the Features page.'
+  },
+  channel_count: {
+    name: 'Channel Count',
+    type: 'number_array',
+    default: [1, 2],
+    description: 'How many channel belts each model gets, drawn between min and max. More channels give more sinuous sand bodies at different depths, and each adds roughly 5 to 10 seconds. Only used when Include Channels is on.'
+  },
+  channel_width: {
+    name: 'Channel Width (m)',
+    type: 'number_array',
+    default: [80, 250],
+    description: 'Channel width in metres, drawn for each channel. Wider channels give broad belts with long, gentle bends; narrower channels give tighter meanders that stay visible on small cubes. Keep it above about two cell sizes so the channel is resolved.'
+  },
+  channel_thickness_scale: {
+    name: 'Channel Thickness Scale',
+    type: 'number',
+    default: 1.0,
+    step: 0.1,
+    description: 'Multiplies the channel sand thickness. 1.0 gives point bars of about 5 to 20 m. Higher values make channels thicker, brighter and easier to see in the seismic; lower values make them thin and subtle, close to the limit of seismic resolution.'
+  },
+  channel_bin_size: {
+    name: 'Channel Bin Size (m)',
+    type: 'number',
+    default: 25,
+    step: 1,
+    description: 'Real-world size of one cube cell in metres. Larger cells make a channel cover fewer cells, so the same cube spans more ground and bends look smaller; smaller cells enlarge channels so only a few bends fill the cube.'
   },
   include_salt: {
     name: 'Include Salt',
     type: 'boolean',
     default: true,
-    description: 'Switch to turn on/off salt bodies. Adds allochthonous salt structures to the model.'
+    description: 'Inserts a salt body that pushes up and drags the surrounding layers and appears as its own lithology in the labels. It adds structural complexity and salt-flank trap geometries.'
   },
   write_to_hdf: {
     name: 'Write to HDF',
     type: 'boolean',
     default: false,
-    description: 'Write QC and additional volumes to HDF file. Creates large output files for detailed analysis.'
+    description: 'Also writes the QC and extra volumes to an HDF file. The files are large and only useful for external analysis; the main outputs are not affected.'
   },
   broadband_qc_volume: {
     name: 'Broadband QC Volume',
     type: 'boolean',
     default: false,
-    description: 'Output a bandpassed seismic data with a low-cut of 2Hz and high-cut of 90Hz to simulate broadband seismic.'
+    description: 'Outputs an extra broadband (2 to 90 Hz) seismic volume alongside the normal band-limited ones. It shows what the model looks like at full resolution and adds one volume to the output.'
   },
   model_qc_volumes: {
     name: 'Model QC Volumes',
     type: 'boolean',
     default: true,
-    description: 'Save QC volumes to disk. Generates intermediate model volumes for quality control.'
+    description: 'Saves intermediate volumes (geologic age, fault planes, onlap segments and similar) to disk. They take extra space but let you inspect the model and use the labels.'
   },
   multiprocess_bp: {
     name: 'Multiprocess Bandpass',
     type: 'boolean',
     default: true,
-    description: 'Use multiprocessing to speed up the bandpass operations. Significantly faster on multi-core systems.'
+    description: 'Runs the band-pass filtering of the seismic volumes in parallel. It is faster on multi-core machines and does not change the results.'
   }
 }
 
@@ -274,6 +300,12 @@ const configSections = [
     name: 'Geological Features', 
     description: 'Special geological features to include',
     fields: ['basin_floor_fans', 'include_channels', 'include_salt', 'variable_shale_ng', 'partial_voxels'] 
+  },
+  { 
+    id: 'channels',
+    name: 'Channel Settings', 
+    description: 'Fluvial channel belt parameters (used when Include Channels is on)',
+    fields: ['channel_count', 'channel_width', 'channel_thickness_scale', 'channel_bin_size'] 
   },
   { 
     id: 'output',
@@ -781,13 +813,13 @@ export default function Configs() {
                                 <label className="text-sm font-medium">{paramDef?.name || field}</label>
                                 <div className="group relative">
                                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                                  <div className="absolute left-0 bottom-full mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  <div className="absolute left-0 bottom-full mb-2 w-80 p-2 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                     {paramDef?.description || 'No description available'}
                                     <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-gray-900" />
                                   </div>
                                 </div>
                               </div>
-                              {renderField(field, (configData as Record<string, unknown>)[field], handleFieldChange, paramDef!)}
+                              {renderField(field, (configData as unknown as Record<string, unknown>)[field] ?? paramDef?.default, handleFieldChange, paramDef!)}
                               <p className="text-xs text-muted-foreground">
                                 Default: {JSON.stringify(paramDef?.default)}
                               </p>

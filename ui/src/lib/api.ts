@@ -35,6 +35,10 @@ export interface ModelConfig {
   variable_shale_ng: boolean;
   basin_floor_fans: boolean;
   include_channels: boolean;
+  channel_count?: number[];
+  channel_width?: number[];
+  channel_thickness_scale?: number;
+  channel_bin_size?: number;
   include_salt: boolean;
   write_to_hdf: boolean;
   broadband_qc_volume: boolean;
@@ -118,6 +122,10 @@ export const defaultConfig: ModelConfig = {
   variable_shale_ng: false,
   basin_floor_fans: false,
   include_channels: false,
+  channel_count: [1, 2],
+  channel_width: [80.0, 250.0],
+  channel_thickness_scale: 1.0,
+  channel_bin_size: 25.0,
   include_salt: true,
   write_to_hdf: false,
   broadband_qc_volume: false,
@@ -599,5 +607,56 @@ export async function validatePaths(workFolder: string, projectFolder: string): 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ work_folder: workFolder, project_folder: projectFolder }),
   });
+  return res.json();
+}
+
+// Feature preview API (channels, fans, clinoforms)
+export type FeatureKind = 'channels' | 'fans' | 'clinoforms';
+
+export interface FeaturePreviewRequest {
+  feature: FeatureKind;
+  cube_size: number;
+  seed?: number | null;
+  channel_count?: number[];
+  channel_width?: number[];
+  channel_thickness_scale?: number;
+  channel_bin_size?: number;
+  n_clinoforms?: number | null;
+  azimuth?: number | null;
+  relief_m?: number | null;
+  foreset_angle_deg?: number | null;
+  step_m?: number | null;
+  aggradation_m?: number | null;
+  erosion?: boolean | null;
+  erosion_position?: number | null;
+  erosion_depth_m?: number | null;
+  n_valleys?: number | null;
+  valley_depth_m?: number | null;
+  stepdown_m?: number | null;
+}
+
+export interface FeaturePreview {
+  feature: FeatureKind;
+  nx: number;
+  ny: number;
+  thickness: number[][];
+  max_thickness_m: number;
+  covered_pct: number;
+  line: [number, number, number, number];
+  section: { x_cells: number[]; horizons: number[][]; labels: string[]; erosion?: number[] | null; terminations?: { type: string; x: number; z: number }[] | null };
+  info: Record<string, number>;
+  elapsed_s: number;
+}
+
+export async function previewFeature(req: FeaturePreviewRequest): Promise<FeaturePreview> {
+  const res = await fetch(`${API_BASE}/features/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail || 'Failed to generate feature preview');
+  }
   return res.json();
 }

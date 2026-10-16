@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Play, Settings, Waves, Activity, GitBranch, Layers, Database } from 'lucide-react'
+import { LayoutDashboard, Play, Settings, Waves, Activity, GitBranch, Layers, Database, Mountain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { href: '/faults', label: 'Faults', icon: GitBranch },
   { href: '/rockphysics', label: 'Rock Physics', icon: Waves },
   { href: '/wavelets', label: 'Wavelets', icon: Activity },
+  { href: '/features', label: 'Features', icon: Mountain },
   { href: '/augmentation', label: 'Augmentation', icon: Layers },
   { href: '/datasets', label: 'Datasets', icon: Database },
 ]

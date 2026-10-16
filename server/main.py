@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from pathlib import Path
 
 from .api.routes import router as api_router
+from .api.features import router as features_router
 
 
 app = FastAPI(
@@ -27,6 +28,7 @@ app.add_middleware(
 
 # Include API routes FIRST (before catch-all)
 app.include_router(api_router)
+app.include_router(features_router)
 
 
 # Serve the React frontend in production
