@@ -13,8 +13,8 @@ cd /d "%SCRIPT_DIR%"
 REM Set Python path
 set PYTHONPATH=.
 
-echo [1/2] Starting Backend Server on port 8001...
-start "SynToSeis Backend" cmd /k "python -m uvicorn server.main:app --port 8001 --reload"
+echo [1/2] Starting Backend Server on port 8000...
+start "SynToSeis Backend" cmd /k ".venv\Scripts\python.exe -m uvicorn server.main:app --port 8000 --reload"
 
 REM Wait for backend to start
 timeout /t 3 /nobreak >nul
@@ -26,7 +26,7 @@ echo.
 echo ========================================
 echo SynToSeis is starting!
 echo.
-echo Backend API:  http://localhost:8001
+echo Backend API:  http://localhost:8000
 echo Frontend UI:  http://localhost:5173 (or next available port)
 echo.
 echo Press any key to stop all servers...

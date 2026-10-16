@@ -44,6 +44,7 @@ scipy==1.17.1
 setuptools==82.0.0
 six==1.17.0
 stack-data==0.6.3
+tables==3.11.1
 tifffile==2026.2.24
 tornado==6.5.4
 tqdm==4.67.3
