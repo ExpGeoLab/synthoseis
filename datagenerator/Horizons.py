@@ -1245,7 +1245,6 @@ class FluvialChannels(Horizons):
     faulting, lithology, closures and seismic all treat it as a sand layer.
     """
 
-    bin_size_m = 25.0  # lateral cell size of the cube (m)
     ms_per_metre = 1.0  # TWT thickness (ms) per metre of sediment (approx. 2000 m/s)
     min_spacing = 3  # minimum separation (layers) from other sand bodies
 
@@ -1257,7 +1256,8 @@ class FluvialChannels(Horizons):
 
     def _generate_channel_lookup_table(self, n_layers, exclude=()):
         """Choose which layers contain a channel belt, away from `exclude` layers."""
-        n_channels = int(np.random.choice([1, 1, 2]))
+        n_min, n_max = self.cfg.channel_count
+        n_channels = int(np.random.randint(n_min, n_max + 1))
         exclude = [int(e) for e in exclude]
         chosen = []
         candidates = np.arange(10, max(11, n_layers - 10))
@@ -1280,10 +1280,10 @@ class FluvialChannels(Horizons):
         nx, ny = self.cfg.cube_shape[:2]
         # Square domain big enough to rotate and crop to the cube footprint
         n_cells = int(np.ceil(np.sqrt(2.0) * max(nx, ny))) + 2
-        dx = self.bin_size_m
+        dx = self.cfg.channel_bin_size
         window = n_cells * dx
 
-        width = np.random.uniform(80.0, 250.0)  # channel width (m)
+        width = np.random.uniform(*self.cfg.channel_width)  # channel width (m)
         depth = np.clip(width / np.random.uniform(15.0, 25.0), 6.0, 20.0)
         deltas = 50.0  # sampling distance along centerline (m)
         pad = 100
@@ -1345,6 +1345,7 @@ class FluvialChannels(Horizons):
         samples = (
             thickness_m
             * self.ms_per_metre
+            * self.cfg.channel_thickness_scale
             * self.cfg.infill_factor
             / self.cfg.digi
         )

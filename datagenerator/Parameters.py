@@ -680,6 +680,11 @@ class Parameters(_Borg):
         self.qc_plots = d["extra_qc_plots"]
         self.verbose = d["verbose"]
         self.include_channels = d["include_channels"]
+        # Fluvial channel settings (optional: older config files omit them)
+        self.channel_count = tuple(int(v) for v in d.get("channel_count", [1, 2]))
+        self.channel_width = tuple(float(v) for v in d.get("channel_width", [80.0, 250.0]))
+        self.channel_thickness_scale = float(d.get("channel_thickness_scale", 1.0))
+        self.channel_bin_size = float(d.get("channel_bin_size", 25.0))
         self.include_salt = d["include_salt"]
         self.max_column_height = d["max_column_height"]
         self.closure_types = d["closure_types"]

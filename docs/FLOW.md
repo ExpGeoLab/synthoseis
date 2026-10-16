@@ -394,6 +394,10 @@ project_folder/
 | `include_salt` | bool | true | Enable salt bodies |
 | `basin_floor_fans` | bool | false | Enable fan features |
 | `include_channels` | bool | false | Insert meandering fluvial channel belts (sand bodies, meanderpy) |
+| `channel_count` | [int, int] | [1, 2] | Min/max channel belts per model |
+| `channel_width` | [float, float] | [80, 250] | Min/max channel width (m) |
+| `channel_thickness_scale` | float | 1.0 | Multiplier on channel sand thickness |
+| `channel_bin_size` | float | 25 | Lateral cell size (m) used to scale channels |
 | `variable_shale_ng` | bool | false | Enable lateral NG variation |
 | `partial_voxels` | bool | true | Enable partial voxel blending |
 

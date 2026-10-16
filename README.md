@@ -85,6 +85,10 @@ An example user-parameter json format file is provided in the config folder, and
 | variable_shale_ng          | If true, enable net to gross to vary laterally in shale layers, otherwise use a net to gross of 0                                                                                                       |
 | basin_floor_fans           | Switch to turn on/off basin floor fan-shaped features in layers                                                                                                                                         |
 | include_channels           | Switch to turn on/off fluvial channel belts (meandering point-bar sand bodies, one or two per model)                                                                                                                                             |
+| channel_count              | Min and max number of channel belts per model (default [1, 2]) |
+| channel_width              | Min and max channel width in metres (default [80, 250]) |
+| channel_thickness_scale    | Multiplier for channel sand thickness (default 1.0) |
+| channel_bin_size           | Lateral cell size in metres used to scale channels (default 25) |
 | include_salt               | Switch to turn on/off salt bodies                                                                                                                                                                       |
 | write_to_hdf               | Write QC and additional volumes to HDF file                                                                                                                                                             |
 | broadband_qc_volume        | Output a bandpassed seismic data with a low-cut of 2Hz and high-cut of 90Hz to simulate broadband seismic                                                                                               |

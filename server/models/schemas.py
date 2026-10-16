@@ -49,6 +49,10 @@ class ModelConfig(BaseModel):
     variable_shale_ng: bool = False
     basin_floor_fans: bool = False
     include_channels: bool = False
+    channel_count: List[int] = [1, 2]
+    channel_width: List[float] = [80.0, 250.0]
+    channel_thickness_scale: float = 1.0
+    channel_bin_size: float = 25.0
     include_salt: bool = True
     write_to_hdf: bool = False
     broadband_qc_volume: bool = False
