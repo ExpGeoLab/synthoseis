@@ -2,6 +2,7 @@ from scipy.interpolate import PchipInterpolator
 from scipy.interpolate import UnivariateSpline
 import numpy as np
 import math
+import random
 from scipy.ndimage import uniform_filter
 from scipy.ndimage.morphology import distance_transform_edt
 
@@ -141,3 +142,80 @@ def uniform_stretch(x_cube, y_cube):
     )  # convert to uint8 for writing to disk
 
     return x_cube_sqz, y_cube_sqz
+
+
+def horizontal_flip(x_cube, y_cube, flip_direction="random"):
+    """Flip data horizontally and/or vertically along spatial axes.
+
+    Randomly chooses flip direction per call to increase diversity.
+    Applies the same flip to both seismic data and labels.
+
+    Arguments:
+        x_cube {ndarray} -- 4D array containing seismic data (angles, x, y, z)
+        y_cube {ndarray} -- 3D array containing labels (x, y, z)
+        flip_direction {str} -- 'random', 'horizontal', 'vertical', or 'both'
+
+    Returns:
+        [ndarray, ndarray] -- Flipped seismic data and labels
+    """
+    if flip_direction == "random":
+        flip_direction = random.choice(["horizontal", "vertical", "both"])
+
+    x_out = x_cube.copy()
+    y_out = y_cube.copy()
+
+    if flip_direction in ["horizontal", "both"]:
+        # Flip along X axis (axis=1 for 4D seismic, axis=0 for 3D labels)
+        x_out = np.flip(x_out, axis=1)
+        y_out = np.flip(y_out, axis=0)
+
+    if flip_direction in ["vertical", "both"]:
+        # Flip along Y axis (axis=2 for 4D seismic, axis=1 for 3D labels)
+        x_out = np.flip(x_out, axis=2)
+        y_out = np.flip(y_out, axis=1)
+
+    return x_out, y_out
+
+
+def jitter(x_cube, y_cube, noise_factor=0.02, distribution="random"):
+    """Add random noise to input data to make training harder.
+
+    IMPORTANT: Noise is applied to INPUT (seismic) ONLY, labels remain unchanged.
+    This prevents the model from memorizing exact patterns while maintaining
+    clean target labels.
+
+    Arguments:
+        x_cube {ndarray} -- 4D array containing seismic data
+        y_cube {ndarray} -- 3D array containing labels (unchanged)
+        noise_factor {float} -- Noise magnitude as fraction of signal std (0.0001-0.50)
+        distribution {str} -- 'random', 'gaussian', 'uniform', or 'laplace'
+
+    Returns:
+        [ndarray, ndarray] -- Noised seismic data and ORIGINAL labels
+    """
+    if distribution == "random":
+        distribution = random.choice(["gaussian", "uniform", "laplace"])
+
+    # Calculate noise scale based on signal standard deviation
+    x_std = np.std(x_cube)
+    noise_scale = noise_factor * x_std
+
+    if distribution == "gaussian":
+        # Normal distribution: mean=0, std=noise_scale
+        noise = np.random.normal(0, noise_scale, x_cube.shape)
+    elif distribution == "uniform":
+        # Uniform distribution: range [-noise_scale, +noise_scale]
+        noise = np.random.uniform(-noise_scale, noise_scale, x_cube.shape)
+    elif distribution == "laplace":
+        # Laplace distribution: heavier tails than gaussian
+        # scale parameter = noise_scale / sqrt(2) to match std
+        noise = np.random.laplace(0, noise_scale / np.sqrt(2), x_cube.shape)
+    else:
+        # Default to gaussian if unknown distribution
+        noise = np.random.normal(0, noise_scale, x_cube.shape)
+
+    # Apply noise to input data only
+    x_noised = x_cube + noise
+
+    # Labels remain completely unchanged!
+    return x_noised, y_cube

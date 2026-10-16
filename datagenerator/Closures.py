@@ -1693,6 +1693,13 @@ class Closures(Horizons, Geomodel, Parameters):
         # Write old logfile as well as the sql dict
         msg = f"layers for closure computation: {str(self.top_lith_indices)}\n"
         msg += f"Number of HC Closures : {num_labels}\n"
+        if num_labels == 0:
+            print("WARNING: No hydrocarbon closures detected - this may be due to:")
+            print("  - Small volume size (try increasing cube_shape or test_mode)")
+            print(
+                "  - Layer configuration - too few sand layers or poor closure formation"
+            )
+            print("  - Random seed - try running again with different parameters")
         msg += (
             f"Closure voxel count: {closure_voxel_count} - {closure_voxel_pct:5.2%}\n"
         )

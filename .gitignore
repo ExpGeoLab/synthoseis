@@ -12,3 +12,9 @@ tags
 /multvt2vds.freq.log
 wip*
 *.code-workspace
+
+# UI / local artifacts
+ui/node_modules
+ui/dist
+nul
+datasets/

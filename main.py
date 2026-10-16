@@ -2,9 +2,19 @@
 
 import argparse
 import datetime
+import sys
 import os
+import shutil
 import numpy as np
 import matplotlib.pyplot as plt
+
+import sys
+import os
+
+sys.path.append("../")
+sys.path.append("../../")
+sys.path.append("./datagenerator/")
+
 
 from datagenerator.Closures import Closures
 from datagenerator.Faults import Faults
@@ -15,15 +25,24 @@ from datagenerator.Seismic import SeismicVolume
 from datagenerator.util import plot_3D_closure_plot
 
 
-def build_model(user_json: str, run_id, test_mode: int = None, rpm_factors=None):
+def build_model(
+    user_json: str,
+    run_id,
+    test_mode: int = None,
+    rpm_factors=None,
+    date_stamp: str = None,
+):
     """Build model from config file."""
-    # Set up model parameters
-    p = Parameters(user_json, runid=run_id, test_mode=test_mode)
+    # Set up model parameters with date_stamp if provided
+    p = Parameters(user_json, runid=run_id, test_mode=test_mode, date_stamp=date_stamp)
     p.setup_model(rpm_factors=rpm_factors)
 
     p.hdf_setup(os.path.join(p.temp_folder, "model_data.hdf"))
     # Build un-faulted depth maps and facies array
     depth_maps, onlap_list, fan_list, fan_thicknesses = build_unfaulted_depth_maps(p)
+    print(
+        f"DEBUG main.py: depth_maps.shape = {depth_maps.shape}, id = {id(depth_maps)}"
+    )
     facies = create_facies_array(p, depth_maps, onlap_list, fan_list)
 
     # Build un-faulted geological models
@@ -54,24 +73,51 @@ def build_model(user_json: str, run_id, test_mode: int = None, rpm_factors=None)
     seismic.build_elastic_properties("inv_vel")
     seismic.build_seismic_volumes()
 
-    closures.write_closure_info_to_log(seismic.rfc_raw[1:4, ...])
+    try:
+        rfc_raw = np.array(seismic.rfc_raw)
+        closures.write_closure_info_to_log(rfc_raw[1:4, ...])
+    except Exception as e:
+        print(f"WARNING: write_closure_info_to_log failed: {e}")
+        import traceback
+
+        traceback.print_exc()
 
     elapsed_time = datetime.datetime.now() - p.start_time
     print("\n\n\n...elapsed time is {}".format(elapsed_time))
-    p.write_to_logfile(
-        f"elapsed_time: {elapsed_time}\n",
-        mainkey="model_parameters",
-        subkey="elapsed_time",
-        val=elapsed_time,
-    )
-    p.write_sqldict_to_logfile(f"{p.work_subfolder}/sql_log.txt")
-    p.write_sqldict_to_db()
+
+    try:
+        p.write_to_logfile(
+            f"elapsed_time: {elapsed_time}\n",
+            mainkey="model_parameters",
+            subkey="elapsed_time",
+            val=elapsed_time,
+        )
+    except Exception as e:
+        print(f"ERROR: write_to_logfile failed: {e}")
+
+    try:
+        p.write_sqldict_to_logfile(f"{p.work_subfolder}/sql_log.txt")
+    except Exception as e:
+        print(f"ERROR: write_sqldict_to_logfile failed: {e}")
+
+    try:
+        p.write_sqldict_to_db()
+    except Exception as e:
+        print(f"ERROR: write_sqldict_to_db failed: {e}")
 
     # Cleanup
-    p.h5file.close()
-    os.system("rm -rf " + p.temp_folder)
     try:
-        os.system(f"chmod -R 777 {p.work_subfolder}")
+        p.h5file.close()
+    except Exception as e:
+        print(f"ERROR: h5file.close failed: {e}")
+
+    try:
+        shutil.rmtree(p.temp_folder, ignore_errors=True)
+    except Exception as e:
+        print(f"ERROR: shutil.rmtree failed: {e}")
+
+    try:
+        os.chmod(p.work_subfolder, 0o777)
     except OSError:
         pass
 
@@ -99,6 +145,9 @@ if __name__ == "__main__":
         "-n", "--num_runs", help="Number of models to create", default=1, type=int
     )
     parser.add_argument("-r", "--run_id", help="Run ID", default=None)
+    parser.add_argument(
+        "-d", "--date_stamp", help="Date stamp for folder naming", default=None
+    )
 
     args = parser.parse_args()
 
@@ -124,6 +173,20 @@ if __name__ == "__main__":
         factor_dict["midfactor"] = 1.0
         factor_dict["farfactor"] = 1.0
         # Build model using the selected rpm factors
-        build_model(
-            args.config_file, args.run_id, args.test_mode, rpm_factors=factor_dict
-        )
+        try:
+            build_model(
+                args.config_file,
+                args.run_id,
+                args.test_mode,
+                rpm_factors=factor_dict,
+                date_stamp=args.date_stamp,
+            )
+        except Exception as e:
+            print(f"ERROR: build_model failed: {e}")
+            import traceback
+
+            traceback.print_exc()
+            sys.exit(1)
+
+    print("Main completed successfully, exiting with code 0")
+    sys.exit(0)

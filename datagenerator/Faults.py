@@ -686,7 +686,17 @@ class Faults(Horizons, Geomodel):
         )
 
         # Build faults, and sum displacements
-        displacements_classification, hockeys = self.build_faults(fault_params)
+        try:
+            displacements_classification, hockeys = self.build_faults(fault_params)
+        except Exception as e:
+            print(f"WARNING: FAULT GENERATION FAILED: {e}")
+            print(
+                f"  This may be a probabilistic convergence issue - fault parameters may be too restrictive for volume size"
+            )
+            print(
+                f"  Try: increasing cube_shape, reducing number of faults, or using test_mode with larger value"
+            )
+            raise
         if self.cfg.model_qc_volumes:
             # Write max fault throw cube to disk
             self.vols.write_cube_to_disk(self.max_fault_throw[:], "max_fault_throw")
@@ -2334,7 +2344,7 @@ class Faults(Horizons, Geomodel):
         print(
             f"    ... Max displacement point before rotation and adding of padding x,y = {x_center} {y_center}"
         )
-        new_matrix = np.lib.pad(
+        new_matrix = np.pad(
             new_matrix, ((abs(x_pad), abs(x_pad)), (abs(y_pad), abs(y_pad))), "edge"
         )
         new_matrix = np.roll(new_matrix, int(x_roll), axis=0)

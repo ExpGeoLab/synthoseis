@@ -11,6 +11,9 @@ import numpy as np
 import tables
 import subprocess
 
+# Import path utilities for unified folder naming
+from datagenerator.paths import get_output_folder_path, get_temp_folder_path
+
 dir_name = os.path.dirname(__file__)
 CONFIG_PATH = os.path.abspath(os.path.join(dir_name, "../config/config_ht.json"))
 
@@ -69,7 +72,13 @@ class Parameters(_Borg):
         Method that writes to the logfile
     """
 
-    def __init__(self, user_config: str = CONFIG_PATH, test_mode=None, runid=None):
+    def __init__(
+        self,
+        user_config: str = CONFIG_PATH,
+        test_mode=None,
+        runid=None,
+        date_stamp=None,
+    ):
         """
         Initialize the Parameters object.
 
@@ -83,6 +92,8 @@ class Parameters(_Borg):
         runid : `str`, optional
             This is the runid of the run, this comes in handy when you have many runs
             with various permutations of parameters, by default None
+        date_stamp : `str`, optional
+            The date stamp string for folder naming. If not provided, generates current timestamp.
         """
         # reset the parameter dict in case we are building models within a loop, and the shared_state dict is not empty
         self._shared_state = {}
@@ -91,6 +102,7 @@ class Parameters(_Borg):
         self.parameter_file = user_config
         self.test_mode = test_mode
         self.runid = runid
+        self.date_stamp_override = date_stamp  # Store for later use
         self.rpm_scaling_factors = dict()
         self.sqldict = defaultdict(dict)
 
@@ -444,24 +456,30 @@ class Parameters(_Borg):
         """
         self.current_dir = os.getcwd()
         self.start_time = datetime.datetime.now()
-        self.date_stamp = self.year_plus_fraction()
+        # Use provided date_stamp if available, otherwise generate new one
+        if hasattr(self, "date_stamp_override") and self.date_stamp_override:
+            self.date_stamp = self.date_stamp_override
+        else:
+            self.date_stamp = self.year_plus_fraction()
 
         # Read from input json
         self.parameters_json = self._read_json()
         self._read_user_params()
 
-        # Directories
-        model_dir = f"{dname}__{self.date_stamp}"
-        temp_dir = f"temp_folder__{self.date_stamp}"
-        self.work_subfolder = os.path.abspath(
-            os.path.join(self.project_folder, model_dir)
+        # Directories - use unified path calculation
+        self.work_subfolder = get_output_folder_path(
+            project=self.project,
+            project_folder=self.project_folder,
+            work_folder=self.work_folder,
+            run_id=self.runid,
+            test_mode=self.test_mode,
+            date_stamp=self.date_stamp,
         )
-        self.temp_folder = os.path.abspath(
-            os.path.join(self.work_folder, f"temp_folder__{self.date_stamp}")
+        self.temp_folder = get_temp_folder_path(
+            work_folder=self.work_folder,
+            run_id=self.runid,
+            date_stamp=self.date_stamp,
         )
-        if self.runid:
-            self.work_subfolder = f"{self.work_subfolder}_{self.runid}"
-            self.temp_folder = f"{self.temp_folder}_{self.runid}"
 
         # Various model parameters, not in config
         self.num_lyr_lut = self.cube_shape[2] * 2 * self.infill_factor
@@ -703,27 +721,12 @@ class Parameters(_Borg):
         -------
         None
         """
+        # Note: Folder paths are already set correctly by get_output_folder_path()
+        # in setup_model(), which handles test_mode folder naming
 
-        # Set output model folder in work_folder location but with same directory name as project_folder
-        normpath = (
-            os.path.normpath(self.project_folder) + "_test_mode_"
-        )  # strip trailing / if added
-        new_project_folder = os.path.join(self.work_folder, os.path.basename(normpath))
-        # Put all folders inside project folder for easy deleting
-        self.work_folder = new_project_folder
-        self.project_folder = new_project_folder
-        self.work_subfolder = os.path.join(
-            new_project_folder, os.path.basename(self.work_subfolder)
-        )
-        if self.runid:
-            # Append runid if provided
-            self.temp_folder = f"{self.temp_folder}_{self.runid}__{self.date_stamp}"
-        else:
-            self.temp_folder = os.path.abspath(
-                os.path.join(self.work_folder, f"temp_folder__{self.date_stamp}")
-            )
         # Set smaller sized model
         self.cube_shape = tuple([size_x, size_y, self.cube_shape[-1]])
+
         # Print message to user
         print(
             "{0}\nTesting Mode\nOutput Folder: {1}\nCube_Shape: {2}\n{0}".format(

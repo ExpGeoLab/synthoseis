@@ -162,7 +162,9 @@ def select_rpm(cfg):
     return rpm
 
 
-def rpm_qc_plots(cfg, rpm):
+def rpm_qc_plots(
+    cfg, rpm, faults=None, traps=None, rho_arr=None, vp_arr=None, vs_arr=None
+):
     from datagenerator.util import import_matplotlib
 
     plt = import_matplotlib()
@@ -171,21 +173,29 @@ def rpm_qc_plots(cfg, rpm):
     rpm = rpm.create_1d_trends()
 
     # Randomised rock properties. decimate a bit
-    if hasattr(cfg, "bulk_z_shift"):
-        depth = (
-            cfg.h5file.root.ModelData.faulted_depth[::4, ::4, ::2] + cfg.bulk_z_shift
+    if faults is None or traps is None or rho_arr is None:
+        print(
+            "WARNING: rpm_qc_plots called without required data objects, skipping QC plots"
         )
+        return
+
+    if hasattr(cfg, "bulk_z_shift"):
+        depth = faults.faulted_depth[::4, ::4, ::2] + cfg.bulk_z_shift
     else:
-        depth = cfg.h5file.root.ModelData.faulted_depth[::4, ::4, ::2]
-    lith = cfg.h5file.root.ModelData.faulted_lithology[::4, ::4, ::2]
-    ng = cfg.h5file.root.ModelData.faulted_net_to_gross[::4, ::4, ::2]
-    rho = cfg.h5file.root.ModelData.rho[::4, ::4, ::2]
-    vp = cfg.h5file.root.ModelData.vp[::4, ::4, ::2]
-    vs = cfg.h5file.root.ModelData.vs[::4, ::4, ::2]
-    oil = cfg.h5file.root.ModelData.oil_closures[::4, ::4, ::2]
-    gas = cfg.h5file.root.ModelData.gas_closures[::4, ::4, ::2]
+        depth = faults.faulted_depth[::4, ::4, ::2]
+    lith = faults.faulted_lithology[::4, ::4, ::2]
+    ng = faults.faulted_net_to_gross[::4, ::4, ::2]
+    rho = rho_arr[::4, ::4, ::2]
+    vp = vp_arr[::4, ::4, ::2]
+    vs = vs_arr[::4, ::4, ::2]
+    oil = traps.oil_closures[::4, ::4, ::2]
+    gas = traps.gas_closures[::4, ::4, ::2]
     if cfg.include_salt:
-        salt = cfg.h5file.root.ModelData.salt_segments[::4, ::4, ::2]
+        salt = (
+            faults.salt_model.salt_segments[::4, ::4, ::2]
+            if hasattr(faults, "salt_model")
+            else np.zeros_like(depth)
+        )
         rho_salt = rho[salt > 0]
         vp_salt = vp[salt > 0]
         vs_salt = vs[salt > 0]
